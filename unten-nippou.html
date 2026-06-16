@@ -156,8 +156,8 @@
       </div>
 
       <label class="f">行先（工事名）</label>
-      <input type="text" id="i-dest" placeholder="例：〇〇現場">
-      <div class="chips" id="destChips"></div>
+      <select id="i-dest-sel"></select>
+      <input type="text" id="i-dest-other" placeholder="その他の行先を入力" style="display:none; margin-top:8px">
 
       <div class="row" style="margin-top:10px">
         <div>
@@ -319,7 +319,7 @@ const INSP_ITEMS=[
 ];
 const DEF_PROFILE={
   sharyo:"", kanrisha:"", gm:"", kakaricho:"", untenkanri:"",
-  group:"保全第1グループ", driver:"", t1:"08:00", t2:"17:00", dests:[]
+  group:"保全第1グループ", driver:"", t1:"08:00", t2:"17:00", dests:["HYDEC","SYS","支店"]
 };
 function safeSet(key,val){
   try{ localStorage.setItem(key,val); return true; }
@@ -405,29 +405,39 @@ $("seg-mokushi").querySelectorAll("button").forEach(btn=>{
   });
 });
 
-/* ============ 行先チップ ============ */
-function renderDestChips(){
-  const wrap=$("destChips"); wrap.innerHTML="";
-  (profile.dests||[]).forEach(d=>{
-    if(!d) return;
-    const c=document.createElement("button"); c.type="button"; c.className="chip"; c.textContent=d;
-    c.addEventListener("click",()=>{ $("i-dest").value=d; highlightChips(); });
-    wrap.appendChild(c);
-  });
-  highlightChips();
+/* ============ 行先プルダウン ============ */
+const DEST_OTHER="__other__";
+function populateDestSelect(){
+  const sel=$("i-dest-sel"); const keep=getDest();
+  sel.innerHTML="";
+  (profile.dests||[]).forEach(d=>{ if(!d) return; const o=document.createElement("option"); o.value=d; o.textContent=d; sel.appendChild(o); });
+  const oo=document.createElement("option"); oo.value=DEST_OTHER; oo.textContent="その他（手入力）"; sel.appendChild(oo);
+  setDest(keep);
 }
-function highlightChips(){
-  const cur=$("i-dest").value.trim();
-  document.querySelectorAll("#destChips .chip").forEach(c=>c.classList.toggle("on",c.textContent===cur));
+function onDestChange(){
+  $("i-dest-other").style.display = $("i-dest-sel").value===DEST_OTHER ? "block" : "none";
 }
-$("i-dest").addEventListener("input",highlightChips);
+function getDest(){
+  const sel=$("i-dest-sel"); if(!sel) return "";
+  return sel.value===DEST_OTHER ? $("i-dest-other").value.trim() : (sel.value||"");
+}
+function setDest(val){
+  const sel=$("i-dest-sel"); if(!sel) return;
+  val=(val||"").trim();
+  const inList = val && Array.from(sel.options).some(o=>o.value===val && o.value!==DEST_OTHER);
+  if(inList){ sel.value=val; $("i-dest-other").value=""; }
+  else if(val){ sel.value=DEST_OTHER; $("i-dest-other").value=val; }
+  else { sel.selectedIndex=0; $("i-dest-other").value=""; }
+  onDestChange();
+}
+$("i-dest-sel").addEventListener("change",onDestChange);
 
 /* ============ 入力フォーム 初期化 ============ */
 function resetInputForm(){
   editingId=null;
   $("i-date").value=todayISO();
   $("i-driver").value=profile.driver||"";
-  $("i-dest").value="";
+  setDest("");
   $("i-t1").value=profile.t1||"08:00";
   $("i-t2").value=profile.t2||"17:00";
   $("i-meter").value="";
@@ -440,7 +450,6 @@ function resetInputForm(){
   updateMeterHint();
   $("editingHint").style.display="none";
   $("saveBtn").textContent="この日を保存";
-  highlightChips();
 }
 function updateMeterHint(){
   const dateISO=$("i-date").value;
@@ -468,7 +477,7 @@ $("i-meter").addEventListener("input",updateMeterHint);
 $("saveBtn").addEventListener("click",()=>{
   const date=$("i-date").value;
   if(!isISODate(date)){ toast("使用日を入れてください",true); return; }
-  const dest=$("i-dest").value.trim();
+  const dest=getDest();
   if(!dest){ toast("行先（工事名）を入れてください",true); return; }
   // 同じ日が既にある場合（新規時のみ）—1日まとめ運用での重複に注意喚起
   if(!editingId){
@@ -561,7 +570,7 @@ function editEntry(id){
   editingId=id;
   $("i-date").value=e.date;
   $("i-driver").value=e.driver||"";
-  $("i-dest").value=e.dest||"";
+  setDest(e.dest||"");
   $("i-t1").value=e.t1||"08:00"; $("i-t2").value=e.t2||"17:00";
   $("i-meter").value=(e.meter===""||e.meter==null)?"":e.meter;
   $("i-fuel").value=(e.fuel===""||e.fuel==null)?"":e.fuel;
@@ -569,7 +578,7 @@ function editEntry(id){
   mokushi=e.mokushi||"対面";
   $("seg-mokushi").querySelectorAll("button").forEach(b=>{const on=b.dataset.v===mokushi;b.classList.toggle("on",on);b.classList.toggle("mid",on);});
   inspState=Object.assign({pedal:"レ",side:"レ",tire:"レ",signal:"レ"},e.insp||{});
-  syncInsp(); updateMeterHint(); highlightChips();
+  syncInsp(); updateMeterHint();
   $("saveBtn").textContent="変更を保存";
   const eh=$("editingHint"); eh.style.display="block";
   eh.innerHTML=`編集中：${e.date} ・ <a href="#" id="delLink" style="color:var(--bad)">この日を削除</a>`;
@@ -606,7 +615,7 @@ $("saveSet").addEventListener("click",()=>{
     dests:$("s-dests").value.split(/[,、\n]/).map(s=>s.trim()).filter(Boolean)
   };
   saveProfile(profile);
-  updateVehLine(); renderDestChips();
+  updateVehLine(); populateDestSelect();
   if(!$("i-driver").value) $("i-driver").value=profile.driver||"";
   toast("設定を保存しました ✓");
 });
@@ -824,7 +833,7 @@ $("importFile").addEventListener("change",ev=>{
         entries=Object.values(map); saveEntries(entries);
       }
       if(data.submitted && typeof data.submitted==="object"){ submitted=Object.assign({},submitted,data.submitted); saveSubmitted(submitted); }
-      updateVehLine(); renderDestChips(); renderList(); refreshSubStatus(); updateReminder();
+      updateVehLine(); populateDestSelect(); renderList(); refreshSubStatus(); updateReminder();
       toast("読み込みました ✓");
     }catch(e){ toast("JSON形式が不正です。読み込めませんでした",true); }
   };
@@ -853,7 +862,7 @@ function updateReminder(){
 /* ============ 初期化 ============ */
 async function init(){
   buildInsp();
-  renderDestChips();
+  populateDestSelect();
   resetInputForm();
   updateVehLine();
   $("o-month").value=ymNow();
