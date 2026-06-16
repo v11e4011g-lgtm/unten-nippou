@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="運転日報">
+<meta name="theme-color" content="#1f6feb">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='38' fill='%231f6feb'/><text x='90' y='118' font-size='90' text-anchor='middle' fill='white' font-family='sans-serif'>&#128663;</text></svg>">
+<title>運転日報・始業点検記録</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#181b22; --card2:#21252e; --line:#2b303b;
+    --txt:#e8eaed; --sub:#9aa3b2; --accent:#3b82f6; --accent2:#2563eb;
+    --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --radius:14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; touch-action:manipulation;}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+    font-size:16px; line-height:1.5;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+    -webkit-text-size-adjust:100%;
+  }
+  header.app{
+    position:sticky; top:0; z-index:10;
+    background:linear-gradient(180deg,#1b2330,#141821);
+    border-bottom:1px solid var(--line);
+    padding:12px 16px calc(12px) 16px;
+  }
+  header.app h1{font-size:17px; margin:0; font-weight:700; letter-spacing:.02em;}
+  header.app .veh{font-size:12px; color:var(--sub); margin-top:2px;}
+  main{padding:14px 14px 110px 14px; max-width:680px; margin:0 auto;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:14px;}
+  .card h2{font-size:14px; margin:0 0 10px 0; color:var(--sub); font-weight:600; letter-spacing:.03em;}
+  label.f{display:block; font-size:12px; color:var(--sub); margin:10px 0 4px;}
+  input,select,textarea,button{font-family:inherit; font-size:16px;}
+  input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{
+    width:100%; background:var(--card2); border:1px solid var(--line); color:var(--txt);
+    border-radius:10px; padding:11px 12px; outline:none;
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+  .row{display:flex; gap:10px;}
+  .row>*{flex:1; min-width:0;}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;}
+  .chip{background:var(--card2); border:1px solid var(--line); color:var(--txt);
+    padding:8px 12px; border-radius:999px; font-size:14px;}
+  .chip.on{background:var(--accent2); border-color:var(--accent); color:#fff;}
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--accent2); color:#fff; border:none; border-radius:12px;
+    padding:14px 16px; font-weight:700; width:100%; cursor:pointer;}
+  .btn:active{transform:scale(.99);}
+  .btn.sec{background:var(--card2); color:var(--txt); border:1px solid var(--line);}
+  .btn.ghost{background:transparent; color:var(--accent); border:1px solid var(--line);}
+  .btn.danger{background:transparent; color:var(--bad); border:1px solid var(--line);}
+  .btn.sm{padding:9px 12px; font-size:14px; width:auto;}
+  .insp{display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-top:1px dashed var(--line);}
+  .insp:first-child{border-top:none;}
+  .insp .nm{font-size:13px;}
+  .seg{display:flex; border:1px solid var(--line); border-radius:9px; overflow:hidden;}
+  .seg button{background:var(--card2); color:var(--sub); border:none; padding:7px 12px; font-size:13px;}
+  .seg button.on{background:var(--ok); color:#06210f; font-weight:700;}
+  .seg button.on.x{background:var(--bad); color:#2a0707;}
+  .seg button.on.mid{background:var(--accent2); color:#fff;}
+  .list-item{display:flex; align-items:center; gap:10px; padding:11px 4px; border-top:1px solid var(--line);}
+  .list-item:first-child{border-top:none;}
+  .li-date{font-weight:700; width:54px; flex:none; font-variant-numeric:tabular-nums;}
+  .li-main{flex:1; min-width:0;}
+  .li-dest{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .li-sub{font-size:12px; color:var(--sub);}
+  .li-km{font-variant-numeric:tabular-nums; color:var(--sub); font-size:13px; text-align:right; flex:none;}
+  .badge{display:inline-block; font-size:11px; padding:1px 7px; border-radius:999px; background:var(--card2); color:var(--sub); border:1px solid var(--line);}
+  .sum{display:flex; gap:10px; margin-bottom:6px;}
+  .sum .box{flex:1; background:var(--card2); border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center;}
+  .sum .box b{display:block; font-size:20px; font-variant-numeric:tabular-nums;}
+  .sum .box span{font-size:11px; color:var(--sub);}
+  .tabbar{position:fixed; bottom:0; left:0; right:0; z-index:20;
+    background:rgba(20,24,33,.96); backdrop-filter:blur(10px);
+    border-top:1px solid var(--line); display:flex;
+    padding-bottom:env(safe-area-inset-bottom);}
+  .tabbar button{flex:1; background:none; border:none; color:var(--sub); padding:9px 0 8px; font-size:10px; display:flex; flex-direction:column; align-items:center; gap:3px;}
+  .tabbar button .ic{font-size:21px; line-height:1;}
+  .tabbar button.on{color:var(--accent);}
+  .hint{font-size:12px; color:var(--sub); margin-top:8px; line-height:1.6;}
+  .toast{position:fixed; left:50%; bottom:100px; transform:translateX(-50%);
+    background:#0b3d1e; color:#bbf7d0; border:1px solid #1f7a45; padding:11px 18px;
+    border-radius:12px; font-size:14px; z-index:50; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
+  .toast.err{background:#3d0b0b; color:#fecaca; border-color:#7a1f1f;}
+  .muted{color:var(--sub);}
+  .view{display:none;}
+  .view.on{display:block;}
+  details summary{cursor:pointer; font-size:13px; color:var(--sub); padding:6px 0;}
+  .kv{font-size:12px; color:var(--sub);}
+  .warnbox{background:#3a2a0a; border:1px solid #7a5a1f; color:#fde68a; border-radius:10px; padding:10px 12px; font-size:12.5px; margin-bottom:12px;}
+  .caution{background:#2a1410; border:1px solid #7a3a2f; color:#fdba9a; border-radius:10px; padding:9px 11px; font-size:11.5px; line-height:1.5; margin-top:12px;}
+  .reminder{background:#3a2a0a; border-bottom:1px solid #7a5a1f; color:#fde68a; padding:10px 16px; font-size:13px; display:flex; align-items:center; gap:10px; justify-content:space-between;}
+  .reminder a{color:#fcd34d; font-weight:700; white-space:nowrap;}
+  .li-ng{color:var(--bad); font-weight:700;}
+  .center{text-align:center;}
+  .mono{font-variant-numeric:tabular-nums;}
+
+  /* ===== 印刷用 公式様式 ===== */
+  #printArea{display:none;}
+  .pf{color:#000;}
+  .pf table{border-collapse:collapse; width:100%; table-layout:fixed;}
+  .pf td,.pf th{border:1px solid #000; font-size:8.2pt; padding:1px 2px; vertical-align:middle; overflow:hidden; word-break:break-all;}
+  .pf .title{font-size:13pt; font-weight:700; text-align:center; border:none; padding:6px 0 4px;}
+  .pf .grp{text-align:right; border:none; font-size:9pt; padding:0 4px 2px 0;}
+  .pf .hd{background:#eee; text-align:center; font-weight:600; font-size:7.6pt;}
+  .pf .vh{writing-mode:vertical-rl; text-orientation:upright; white-space:nowrap; text-align:center; font-size:7pt; letter-spacing:-.5px;}
+  .pf .ctr{text-align:center;}
+  .pf .left{text-align:left;}
+  .pf .small{font-size:7pt;}
+  .pf .circ{display:inline-block; border:1.3px solid #000; border-radius:50%; padding:0 3px; line-height:1.15;}
+  .pf .note{border:none; font-size:7.4pt; padding:2px 0 0;}
+  .pf .hdr-info td{font-size:8.5pt; height:20px;}
+
+  @media print{
+    @page{size:A4 landscape; margin:8mm 8mm;}
+    body{background:#fff; color:#000; padding:0;}
+    header.app,.tabbar,main{display:none !important;}
+    #printArea{display:block !important;}
+    .pf{page-break-after:always;}
+    .pf:last-child{page-break-after:auto;}
+  }
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>運転日報・始業点検記録</h1>
+  <div class="veh" id="vehLine">車両未設定 — 設定タブで登録してください</div>
+</header>
+
+<div id="reminder" class="reminder" style="display:none"></div>
+
+<main>
+  <!-- ========== 入力 ========== -->
+  <section id="v-input" class="view on">
+    <div class="card">
+      <h2>その日の運転を記録</h2>
+      <div class="row">
+        <div>
+          <label class="f">使用日</label>
+          <input type="date" id="i-date">
+        </div>
+        <div>
+          <label class="f">運転者名</label>
+          <input type="text" id="i-driver" placeholder="氏名">
+        </div>
+      </div>
+
+      <label class="f">行先（工事名）</label>
+      <input type="text" id="i-dest" placeholder="例：〇〇現場">
+      <div class="chips" id="destChips"></div>
+
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label class="f">使用時間</label>
+          <div class="row" style="gap:6px">
+            <input type="time" id="i-t1">
+            <input type="time" id="i-t2">
+          </div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label class="f">走行最終メーター（積算計ODOの数字）</label>
+          <input type="number" inputmode="numeric" id="i-meter" placeholder="例：128450">
+          <div class="hint" id="meterHint"></div>
+        </div>
+        <div>
+          <label class="f">給油 (ℓ) <span class="muted">※給油した日だけ</span></label>
+          <input type="number" inputmode="decimal" id="i-fuel" placeholder="">
+        </div>
+      </div>
+
+      <details style="margin-top:12px">
+        <summary>始業点検・酒気帯び確認（既定でレ/0.00・対面。実施後に確認・必要時変更）</summary>
+        <div class="card2" style="margin-top:8px">
+          <div class="row">
+            <div>
+              <label class="f">アルコール 運転前 (mg/L)</label>
+              <input type="text" inputmode="decimal" id="i-alc1" value="0.00">
+            </div>
+            <div>
+              <label class="f">アルコール 運転後 (mg/L)</label>
+              <input type="text" inputmode="decimal" id="i-alc2" value="0.00">
+            </div>
+          </div>
+          <div class="hint">※会社貸与のアルコール検知器の実測値を入力（目分量・無検査の0.00入力は不可）。0.15以上は運転不可。</div>
+          <label class="f">酒気帯び目視確認</label>
+          <div class="seg" id="seg-mokushi" style="width:max-content">
+            <button data-v="対面" class="on mid">対面</button>
+            <button data-v="非対面">非対面</button>
+          </div>
+          <div id="inspList" style="margin-top:10px"></div>
+        </div>
+      </details>
+
+      <div class="caution">点検・アルコール測定を<b>実施した上で</b>保存してください。未実施のまま自動レ/0.00で記録すると道交法上の虚偽記録になります。</div>
+      <button class="btn" id="saveBtn" style="margin-top:10px">この日を保存</button>
+      <div class="hint center" id="editingHint" style="display:none"></div>
+    </div>
+  </section>
+
+  <!-- ========== 一覧 ========== -->
+  <section id="v-list" class="view">
+    <div class="card">
+      <div class="row" style="align-items:center; gap:8px">
+        <div style="flex:none"><button class="btn sec sm" id="mPrev">‹</button></div>
+        <div class="center" style="flex:1"><b id="monthLabel" class="mono"></b></div>
+        <div style="flex:none"><button class="btn sec sm" id="mNext">›</button></div>
+      </div>
+      <div class="sum" style="margin-top:12px">
+        <div class="box"><b id="sumDays">0</b><span>運転日数</span></div>
+        <div class="box"><b id="sumKm">0</b><span>走行 km(参考)</span></div>
+        <div class="box"><b id="sumFuel">0</b><span>給油 ℓ</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>明細（タップで編集）</h2>
+      <div id="listBody"><div class="muted center" style="padding:20px 0">記録がありません</div></div>
+    </div>
+  </section>
+
+  <!-- ========== 出力 ========== -->
+  <section id="v-out" class="view">
+    <div class="card">
+      <h2>月末の提出物を作る</h2>
+      <label class="f">対象月</label>
+      <input type="month" id="o-month">
+      <div class="hint" id="subStatus" style="margin-top:6px"></div>
+      <button class="btn" id="printBtn" style="margin-top:10px">公式様式で印刷 / PDF化</button>
+      <button class="btn ghost sm" id="markSubmittedBtn" style="margin-top:10px; width:auto">この月を「提出済み」にする</button>
+      <div class="hint">Safariの「共有 → プリント」または「PDFで保存」で提出用ができます。1枚＝1か月（最大26日分）。印刷すると自動で提出済み記録が付きます。</div>
+    </div>
+    <div class="card">
+      <h2>データの書き出し（バックアップ / 原紙xlsx用）</h2>
+      <button class="btn sec" id="exportMonthBtn">この月のデータを共有/コピー</button>
+      <button class="btn ghost" id="exportAllBtn" style="margin-top:10px">全データをバックアップ保存(JSON)</button>
+      <button class="btn ghost" id="importBtn" style="margin-top:10px">バックアップを読み込み</button>
+      <input type="file" id="importFile" accept=".json,application/json,text/plain,*/*" style="display:none">
+      <div class="hint" id="backupHint">コピー/共有したデータをClaude Codeに渡すと、会社の原紙Excel（.xlsx）に自動記入できます。月1回バックアップ保存を推奨。</div>
+    </div>
+  </section>
+
+  <!-- ========== 設定 ========== -->
+  <section id="v-set" class="view">
+    <div class="card">
+      <h2>車両プロフィール（最初に1回だけ登録）</h2>
+      <label class="f">車番（例：三重400 な 113）</label>
+      <input type="text" id="s-sharyo" placeholder="三重400 な ____">
+      <label class="f">車両管理者</label>
+      <input type="text" id="s-kanrisha" placeholder="氏名">
+      <div class="row">
+        <div><label class="f">GM</label><input type="text" id="s-gm"></div>
+        <div><label class="f">係長</label><input type="text" id="s-kakaricho"></div>
+        <div><label class="f">運転管理者</label><input type="text" id="s-untenkanri"></div>
+      </div>
+      <label class="f">所属グループ</label>
+      <input type="text" id="s-group" value="保全第1グループ">
+      <label class="f">標準の運転者名（入力時の初期値）</label>
+      <input type="text" id="s-driver">
+    </div>
+    <div class="card">
+      <h2>入力を速くする初期値</h2>
+      <div class="row">
+        <div><label class="f">標準 開始時刻</label><input type="time" id="s-t1" value="08:00"></div>
+        <div><label class="f">標準 終了時刻</label><input type="time" id="s-t2" value="17:00"></div>
+      </div>
+      <label class="f">行先プリセット（カンマ区切り・よく行く現場）</label>
+      <textarea id="s-dests" rows="2" placeholder="〇〇現場, 事業所, △△支店"></textarea>
+    </div>
+    <div class="card">
+      <button class="btn" id="saveSet">設定を保存</button>
+      <details style="margin-top:14px">
+        <summary>このアプリについて / iPhoneでの使い方</summary>
+        <div class="hint">
+          ・データはこのiPhoneの中だけに保存されます（サーバー送信なし）。<br>
+          ・Safariの「共有 → ホーム画面に追加」でアプリのように使えます。<br>
+          ・<b>月1回、出力タブから「全データをバックアップ保存」</b>でバックアップを取ってください（iPhoneのストレージ整理でデータが消える場合に備えて）。<br>
+          ・アルコール数値欄は<b>会社貸与のアルコール検知器の実測値</b>を入力してください（2023年道交法改正で検知器使用・記録1年保存が義務）。<br>
+          ・始業点検・酒気帯び確認は道路交通法上の義務項目です。必ず実施した上で記録してください。<br>
+          ・月末提出を忘れないよう、iPhone標準の「リマインダー」で毎月末の通知設定も併用すると安心です。
+        </div>
+      </details>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar">
+  <button data-v="input" class="on"><span class="ic">✏️</span>入力</button>
+  <button data-v="list"><span class="ic">📋</span>一覧</button>
+  <button data-v="out"><span class="ic">🖨️</span>出力</button>
+  <button data-v="set"><span class="ic">⚙️</span>設定</button>
+</nav>
+
+<div id="printArea"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============ ストレージ ============ */
+const LSK_P="untenNippou.profile.v1", LSK_E="untenNippou.entries.v1";
+const LSK_SUB="untenNippou.submitted.v1", LSK_BK="untenNippou.lastBackup.v1";
+const FOOTER_NOTE="異常なし・問題なし：レ、異常有り：×（運転管理者連絡）　／　酒気帯び目視確認は対面又は非対面(TEL等確認)のどちらかを〇で囲む　／　給油欄は給油時のガソリン量・軽油量を記入";
+const INSP_ITEMS=[
+  {key:"pedal", name:"ペダル踏みしろ・効き具合"},
+  {key:"side",  name:"サイドブレーキ・効き具合"},
+  {key:"tire",  name:"タイヤ異常な磨耗・損傷"},
+  {key:"signal",name:"方向指示器の点灯具合"},
+];
+const DEF_PROFILE={
+  sharyo:"", kanrisha:"", gm:"", kakaricho:"", untenkanri:"",
+  group:"保全第1グループ", driver:"", t1:"08:00", t2:"17:00", dests:[]
+};
+function safeSet(key,val){
+  try{ localStorage.setItem(key,val); return true; }
+  catch(e){ toast("保存できませんでした（端末の空き容量を確認してください）",true); return false; }
+}
+function loadProfile(){ try{return Object.assign({},DEF_PROFILE,JSON.parse(localStorage.getItem(LSK_P)||"{}"));}catch(e){return Object.assign({},DEF_PROFILE);} }
+function saveProfile(p){ safeSet(LSK_P, JSON.stringify(p)); }
+function loadEntries(){ try{return JSON.parse(localStorage.getItem(LSK_E)||"[]");}catch(e){return [];} }
+function saveEntries(a){ safeSet(LSK_E, JSON.stringify(a)); }
+function loadSubmitted(){ try{return JSON.parse(localStorage.getItem(LSK_SUB)||"{}");}catch(e){return {};} }
+function saveSubmitted(o){ safeSet(LSK_SUB, JSON.stringify(o)); }
+
+let profile=loadProfile();
+let entries=loadEntries();
+let submitted=loadSubmitted();
+let editingId=null;
+let listMonth=ymNow();
+let mokushi="対面";
+let inspState={pedal:"レ",side:"レ",tire:"レ",signal:"レ"};
+
+/* ============ ユーティリティ ============ */
+function $(id){return document.getElementById(id);}
+function ymNow(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+function todayISO(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function uid(){return Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36);}
+function toast(msg,err){const t=$("toast");t.textContent=msg;t.className="toast show"+(err?" err":"");setTimeout(()=>t.className="toast",1900);}
+function entriesOfMonth(ym){return entries.filter(e=>e.date&&e.date.slice(0,7)===ym).sort((a,b)=>a.date.localeCompare(b.date)||(a.t1||"").localeCompare(b.t1||""));}
+function num(v){const n=parseFloat(v);return isFinite(n)?n:0;}
+function numOrEmpty(v){ if(v===""||v==null) return ""; const n=parseFloat(String(v).replace(/[^\d.\-]/g,"")); return isFinite(n)?n:""; }
+function normAlc(v){ const n=parseFloat(String(v==null?"":v).replace(/[^\d.]/g,"")); return isFinite(n)? n.toFixed(2) : "0.00"; }
+function isISODate(s){ return typeof s==="string" && /^\d{4}-\d{2}-\d{2}$/.test(s); }
+function weekdayOf(iso){ const p=iso.split("-").map(Number); return ["日","月","火","水","木","金","土"][new Date(p[0],p[1]-1,p[2]).getDay()]; }
+
+/* ============ タブ ============ */
+document.querySelectorAll(".tabbar button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    document.querySelectorAll(".tabbar button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    const v=b.dataset.v;
+    document.querySelectorAll(".view").forEach(x=>x.classList.remove("on"));
+    $("v-"+v).classList.add("on");
+    if(v==="list") renderList();
+    if(v==="set") fillSettings();
+    if(v==="out"){ if(!$("o-month").value) $("o-month").value=listMonth; refreshSubStatus(); }
+    window.scrollTo(0,0);
+  });
+});
+
+/* ============ 始業点検 セグメント ============ */
+function buildInsp(){
+  const wrap=$("inspList"); wrap.innerHTML="";
+  INSP_ITEMS.forEach(it=>{
+    const row=document.createElement("div"); row.className="insp";
+    row.innerHTML=`<div class="nm">${it.name}</div>
+      <div class="seg" data-k="${it.key}">
+        <button data-v="レ">レ</button><button data-v="×">×</button>
+      </div>`;
+    wrap.appendChild(row);
+    row.querySelectorAll("button").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        inspState[it.key]=btn.dataset.v;
+        syncInsp();
+      });
+    });
+  });
+  syncInsp();
+}
+function syncInsp(){
+  document.querySelectorAll('#inspList .seg').forEach(seg=>{
+    const k=seg.dataset.k;
+    seg.querySelectorAll("button").forEach(btn=>{
+      const on=btn.dataset.v===inspState[k];
+      btn.classList.toggle("on",on);
+      btn.classList.toggle("x",on&&btn.dataset.v==="×");
+    });
+  });
+}
+$("seg-mokushi").querySelectorAll("button").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    mokushi=btn.dataset.v;
+    $("seg-mokushi").querySelectorAll("button").forEach(b=>{b.classList.remove("on","mid");});
+    btn.classList.add("on","mid");
+  });
+});
+
+/* ============ 行先チップ ============ */
+function renderDestChips(){
+  const wrap=$("destChips"); wrap.innerHTML="";
+  (profile.dests||[]).forEach(d=>{
+    if(!d) return;
+    const c=document.createElement("button"); c.type="button"; c.className="chip"; c.textContent=d;
+    c.addEventListener("click",()=>{ $("i-dest").value=d; highlightChips(); });
+    wrap.appendChild(c);
+  });
+  highlightChips();
+}
+function highlightChips(){
+  const cur=$("i-dest").value.trim();
+  document.querySelectorAll("#destChips .chip").forEach(c=>c.classList.toggle("on",c.textContent===cur));
+}
+$("i-dest").addEventListener("input",highlightChips);
+
+/* ============ 入力フォーム 初期化 ============ */
+function resetInputForm(){
+  editingId=null;
+  $("i-date").value=todayISO();
+  $("i-driver").value=profile.driver||"";
+  $("i-dest").value="";
+  $("i-t1").value=profile.t1||"08:00";
+  $("i-t2").value=profile.t2||"17:00";
+  $("i-meter").value="";
+  $("i-fuel").value="";
+  $("i-alc1").value="0.00"; $("i-alc2").value="0.00";
+  mokushi="対面";
+  $("seg-mokushi").querySelectorAll("button").forEach(b=>{b.classList.toggle("on",b.dataset.v==="対面");b.classList.toggle("mid",b.dataset.v==="対面");});
+  inspState={pedal:"レ",side:"レ",tire:"レ",signal:"レ"};
+  syncInsp();
+  updateMeterHint();
+  $("editingHint").style.display="none";
+  $("saveBtn").textContent="この日を保存";
+  highlightChips();
+}
+function updateMeterHint(){
+  const dateISO=$("i-date").value;
+  const h=$("meterHint");
+  if(!isISODate(dateISO)){ h.textContent=""; return; }
+  const ref=lastMeterBefore(dateISO, editingId);
+  if(ref==null){ h.textContent="（前回メーターの記録がありません）"; h.style.color=""; return; }
+  const cur=parseFloat($("i-meter").value);
+  if(isFinite(cur)){
+    if(cur>=ref){ h.style.color=""; h.textContent=`前回 ${ref.toLocaleString()} km → 今回 ${cur.toLocaleString()} km（+${(cur-ref).toLocaleString()} km）`; }
+    else { h.style.color="var(--bad)"; h.textContent=`⚠ 前回 ${ref.toLocaleString()} km より小さい値です（ODO=積算計の数字を入れてください）`; }
+  } else { h.style.color=""; h.textContent=`前回の最終メーター：${ref.toLocaleString()} km`; }
+}
+// dateISO より前（厳密に過去日付）の最終メーター。同日内は (t1,id) 昇順の最後を採る。
+function lastMeterBefore(dateISO, exceptId){
+  const cand=entries.filter(e=>e.id!==exceptId && e.meter!=="" && e.meter!=null && isISODate(e.date) && e.date<dateISO)
+    .sort((a,b)=>a.date.localeCompare(b.date)||(a.t1||"").localeCompare(b.t1||"")||(a.ts||0)-(b.ts||0));
+  if(cand.length) return num(cand[cand.length-1].meter);
+  return null;
+}
+$("i-date").addEventListener("change",updateMeterHint);
+$("i-meter").addEventListener("input",updateMeterHint);
+
+/* ============ 保存 ============ */
+$("saveBtn").addEventListener("click",()=>{
+  const date=$("i-date").value;
+  if(!isISODate(date)){ toast("使用日を入れてください",true); return; }
+  const dest=$("i-dest").value.trim();
+  if(!dest){ toast("行先（工事名）を入れてください",true); return; }
+  // 同じ日が既にある場合（新規時のみ）—1日まとめ運用での重複に注意喚起
+  if(!editingId){
+    const dup=entries.find(e=>e.date===date);
+    if(dup && !confirm(`${date} は既に記録があります。\nもう1件追加しますか？（同じ日を直したい場合は「いいえ」→一覧から編集）`)) return;
+  }
+  // 点検異常（×）時は運転管理者連絡を確認
+  if(Object.values(inspState).some(v=>v==="×")){
+    if(!confirm("始業点検に「×（異常あり）」があります。運転管理者へ連絡しましたか？")){
+      toast("運転管理者へ連絡してから保存してください",true); return;
+    }
+  }
+  const alc1=normAlc($("i-alc1").value), alc2=normAlc($("i-alc2").value);
+  if(parseFloat(alc1)>=0.15 || parseFloat(alc2)>=0.15){
+    if(!confirm("アルコール数値が0.15以上です。基準超過＝運転不可です。記録として保存しますか？")) return;
+  }
+  const rec={
+    id: editingId||uid(),
+    date,
+    driver: $("i-driver").value.trim()||profile.driver||"",
+    t1: $("i-t1").value, t2: $("i-t2").value,
+    dest,
+    meter: numOrEmpty($("i-meter").value),
+    fuel: numOrEmpty($("i-fuel").value),
+    alc1, alc2,
+    mokushi: (mokushi==="対面"||mokushi==="非対面")?mokushi:"対面",
+    insp: Object.assign({pedal:"レ",side:"レ",tire:"レ",signal:"レ"},inspState),
+    ts: Date.now()
+  };
+  if(editingId){ entries=entries.map(e=>e.id===editingId?rec:e); }
+  else { entries.push(rec); }
+  saveEntries(entries);
+  toast(editingId?"更新しました":"保存しました ✓");
+  listMonth=date.slice(0,7);
+  resetInputForm();
+});
+
+/* ============ 一覧 ============ */
+function shiftMonth(d){
+  const [y,m]=listMonth.split("-").map(Number);
+  const dt=new Date(y,m-1+d,1);
+  listMonth=dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0");
+  renderList();
+}
+$("mPrev").addEventListener("click",()=>shiftMonth(-1));
+$("mNext").addEventListener("click",()=>shiftMonth(1));
+function renderList(){
+  const [y,m]=listMonth.split("-");
+  $("monthLabel").textContent=`${y}年 ${Number(m)}月`;
+  const list=entriesOfMonth(listMonth);
+  // 月内走行(参考)=メーター増分の積み上げ。巻き戻り(誤入力/別車両)はbaseを下げず無視。
+  let km=0, fuel=0;
+  const meterRows=list.filter(e=>e.meter!==""&&e.meter!=null);
+  let base=lastMeterBefore(list.length?list[0].date:listMonth+"-01", null);
+  meterRows.forEach(e=>{ if(base!=null){ if(e.meter>=base){ km+=e.meter-base; base=e.meter; } } else { base=e.meter; } });
+  list.forEach(e=>{ if(e.fuel!==""&&e.fuel!=null) fuel+=num(e.fuel); });
+  $("sumDays").textContent=list.length;
+  $("sumKm").textContent=km.toLocaleString();
+  $("sumFuel").textContent=(Math.round(fuel*10)/10).toLocaleString();
+  // 明細
+  const body=$("listBody");
+  if(!list.length){ body.innerHTML='<div class="muted center" style="padding:20px 0">記録がありません</div>'; return; }
+  body.innerHTML="";
+  list.forEach(e=>{
+    const d=Number(e.date.slice(8,10));
+    const wd=weekdayOf(e.date);
+    const item=document.createElement("div"); item.className="list-item";
+    const fuelB=(e.fuel!==""&&e.fuel!=null)?`<span class="badge">⛽${e.fuel}ℓ</span>`:"";
+    const ng=Object.values(e.insp||{}).some(v=>v==="×")||parseFloat(e.alc1)>=0.15||parseFloat(e.alc2)>=0.15;
+    const ngB=ng?`<span class="badge" style="border-color:var(--bad);color:var(--bad)">⚠異常</span>`:"";
+    item.innerHTML=`
+      <div class="li-date ${ng?'li-ng':''}">${d}<span style="font-size:11px;color:var(--sub)">(${wd})</span></div>
+      <div class="li-main">
+        <div class="li-dest">${escapeHtml(e.dest)} ${fuelB}${ngB}</div>
+        <div class="li-sub">${e.t1||""}〜${e.t2||""} ・ ${escapeHtml(e.driver||"")}</div>
+      </div>
+      <div class="li-km">${(e.meter!==""&&e.meter!=null)?Number(e.meter).toLocaleString()+"km":"—"}</div>`;
+    item.addEventListener("click",()=>editEntry(e.id));
+    body.appendChild(item);
+  });
+}
+function escapeHtml(s){return String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+function editEntry(id){
+  const e=entries.find(x=>x.id===id); if(!e) return;
+  // 入力タブへ
+  document.querySelectorAll(".tabbar button").forEach(x=>x.classList.toggle("on",x.dataset.v==="input"));
+  document.querySelectorAll(".view").forEach(x=>x.classList.remove("on"));
+  $("v-input").classList.add("on");
+  editingId=id;
+  $("i-date").value=e.date;
+  $("i-driver").value=e.driver||"";
+  $("i-dest").value=e.dest||"";
+  $("i-t1").value=e.t1||"08:00"; $("i-t2").value=e.t2||"17:00";
+  $("i-meter").value=(e.meter===""||e.meter==null)?"":e.meter;
+  $("i-fuel").value=(e.fuel===""||e.fuel==null)?"":e.fuel;
+  $("i-alc1").value=e.alc1||"0.00"; $("i-alc2").value=e.alc2||"0.00";
+  mokushi=e.mokushi||"対面";
+  $("seg-mokushi").querySelectorAll("button").forEach(b=>{const on=b.dataset.v===mokushi;b.classList.toggle("on",on);b.classList.toggle("mid",on);});
+  inspState=Object.assign({pedal:"レ",side:"レ",tire:"レ",signal:"レ"},e.insp||{});
+  syncInsp(); updateMeterHint(); highlightChips();
+  $("saveBtn").textContent="変更を保存";
+  const eh=$("editingHint"); eh.style.display="block";
+  eh.innerHTML=`編集中：${e.date} ・ <a href="#" id="delLink" style="color:var(--bad)">この日を削除</a>`;
+  $("delLink").addEventListener("click",ev=>{ev.preventDefault();
+    if(confirm("この日の記録を削除しますか？")){ entries=entries.filter(x=>x.id!==id); saveEntries(entries); toast("削除しました"); resetInputForm(); }
+  });
+  window.scrollTo(0,0);
+}
+
+/* ============ 設定 ============ */
+function fillSettings(){
+  $("s-sharyo").value=profile.sharyo||"";
+  $("s-kanrisha").value=profile.kanrisha||"";
+  $("s-gm").value=profile.gm||"";
+  $("s-kakaricho").value=profile.kakaricho||"";
+  $("s-untenkanri").value=profile.untenkanri||"";
+  $("s-group").value=profile.group||"保全第1グループ";
+  $("s-driver").value=profile.driver||"";
+  $("s-t1").value=profile.t1||"08:00";
+  $("s-t2").value=profile.t2||"17:00";
+  $("s-dests").value=(profile.dests||[]).join(", ");
+}
+$("saveSet").addEventListener("click",()=>{
+  profile={
+    sharyo:$("s-sharyo").value.trim(),
+    kanrisha:$("s-kanrisha").value.trim(),
+    gm:$("s-gm").value.trim(),
+    kakaricho:$("s-kakaricho").value.trim(),
+    untenkanri:$("s-untenkanri").value.trim(),
+    group:$("s-group").value.trim()||"保全第1グループ",
+    driver:$("s-driver").value.trim(),
+    t1:$("s-t1").value||"08:00",
+    t2:$("s-t2").value||"17:00",
+    dests:$("s-dests").value.split(/[,、\n]/).map(s=>s.trim()).filter(Boolean)
+  };
+  saveProfile(profile);
+  updateVehLine(); renderDestChips();
+  if(!$("i-driver").value) $("i-driver").value=profile.driver||"";
+  toast("設定を保存しました ✓");
+});
+function updateVehLine(){
+  const parts=[];
+  if(profile.sharyo) parts.push(profile.sharyo);
+  if(profile.kanrisha) parts.push("管理者:"+profile.kanrisha);
+  $("vehLine").textContent= parts.length? parts.join(" ／ ") : "車両未設定 — 設定タブで登録してください";
+}
+
+/* ============ 出力：印刷 ============ */
+function isStandalone(){ return (window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true; }
+$("printBtn").addEventListener("click",()=>{
+  const ym=$("o-month").value||listMonth;
+  if(!profile.sharyo || !profile.kakaricho){
+    toast("先に設定で車番・係長などを登録してください",true);
+    document.querySelector('.tabbar button[data-v="set"]').click(); return;
+  }
+  buildPrint(ym);
+  setTimeout(()=>{
+    window.print();
+    markSubmitted(ym, true);
+  },150);
+  if(isStandalone()){
+    setTimeout(()=>toast("印刷シートが出ない場合はSafariで開いて印刷してください",false),700);
+  }
+});
+function markSubmitted(ym, auto){
+  submitted[ym]=todayISO();
+  saveSubmitted(submitted);
+  refreshSubStatus(); updateReminder();
+  if(!auto) toast(`${ym} を提出済みにしました ✓`);
+}
+$("markSubmittedBtn").addEventListener("click",()=>{
+  const ym=$("o-month").value||listMonth; markSubmitted(ym,false);
+});
+function refreshSubStatus(){
+  const ym=$("o-month").value||listMonth;
+  const el=$("subStatus"); if(!el) return;
+  if(submitted[ym]){ el.innerHTML=`<span style="color:var(--ok)">✓ 提出済み（${submitted[ym]}）</span>`; }
+  else { el.innerHTML=`<span style="color:var(--warn)">未提出</span>`; }
+}
+$("o-month").addEventListener("change",refreshSubStatus);
+function pad2(n){return String(n).padStart(2,"0");}
+function buildPrint(ym){
+  const ROWS=26;
+  const list=entriesOfMonth(ym);
+  const area=$("printArea"); area.innerHTML="";
+  // 26日/ページで分割（0件でも1ページ）
+  const pages=[];
+  for(let i=0;i<Math.max(list.length,1);i+=ROWS) pages.push(list.slice(i,i+ROWS));
+  pages.forEach((chunk,pi)=>{
+    const pf=document.createElement("div"); pf.className="pf";
+    pf.innerHTML=renderPage(ym,chunk,pi+1,pages.length,ROWS);
+    area.appendChild(pf);
+  });
+}
+function renderPage(ym,chunk,pageNo,pageTotal,ROWS){
+  const [y,m]=ym.split("-");
+  let rowsHtml="";
+  for(let i=0;i<ROWS;i++){
+    const e=chunk[i];
+    if(e){
+      const mok=`<span class="${e.mokushi==='対面'?'circ':''}">対面</span> <span class="${e.mokushi==='非対面'?'circ':''}">非対面</span>`;
+      rowsHtml+=`<tr>
+        <td class="ctr">${escapeHtml(e.driver||"")}</td>
+        <td class="ctr">${Number(e.date.slice(5,7))} / ${Number(e.date.slice(8,10))}</td>
+        <td class="ctr small">${e.t1||""}<br>～${e.t2||""}</td>
+        <td class="left small">${escapeHtml(e.dest||"")}</td>
+        <td class="ctr mono">${(e.meter!==""&&e.meter!=null)?Number(e.meter).toLocaleString():""}</td>
+        <td class="ctr small">${escapeHtml(e.alc1||"")}</td>
+        <td class="ctr small">${escapeHtml(e.alc2||"")}</td>
+        <td class="ctr small">${mok}</td>
+        <td class="ctr">${(e.insp&&e.insp.pedal)||""}</td>
+        <td class="ctr">${(e.insp&&e.insp.side)||""}</td>
+        <td class="ctr">${(e.insp&&e.insp.tire)||""}</td>
+        <td class="ctr">${(e.insp&&e.insp.signal)||""}</td>
+        <td class="ctr mono">${(e.fuel!==""&&e.fuel!=null)?e.fuel:""}</td>
+      </tr>`;
+    } else {
+      rowsHtml+=`<tr style="height:20px"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+    }
+  }
+  const pageTag = pageTotal>1 ? `　[${pageNo}/${pageTotal}]` : "";
+  return `
+   <table>
+    <colgroup>
+     <col style="width:8%"><col style="width:6%"><col style="width:8%"><col style="width:22%"><col style="width:9%">
+     <col style="width:5%"><col style="width:5%"><col style="width:11%">
+     <col style="width:4%"><col style="width:4%"><col style="width:4%"><col style="width:4%"><col style="width:6%">
+    </colgroup>
+    <tr><td colspan="13" class="title">運転日報・始業点検記録表（${y}年　${Number(m)}　月度）${pageTag}</td></tr>
+    <tr><td colspan="13" class="grp">${escapeHtml(profile.group||"保全第1グループ")}</td></tr>
+   </table>
+   <table class="hdr-info">
+    <tr>
+      <td class="hd" style="width:8%">車　番</td>
+      <td class="ctr" style="width:40%">${escapeHtml(profile.sharyo||"")}</td>
+      <td class="hd" style="width:6%">GM</td><td style="width:13%" class="ctr">${escapeHtml(profile.gm||"")}</td>
+      <td class="hd" style="width:6%">係長</td><td style="width:13%" class="ctr">${escapeHtml(profile.kakaricho||"")}</td>
+    </tr>
+    <tr>
+      <td class="hd">車両管理者</td>
+      <td class="ctr">${escapeHtml(profile.kanrisha||"")}</td>
+      <td class="hd" colspan="1">運転管理者</td><td class="ctr" colspan="3">${escapeHtml(profile.untenkanri||"")}</td>
+    </tr>
+   </table>
+   <table>
+    <colgroup>
+     <col style="width:8%"><col style="width:6%"><col style="width:8%"><col style="width:22%"><col style="width:9%">
+     <col style="width:5%"><col style="width:5%"><col style="width:11%">
+     <col style="width:4%"><col style="width:4%"><col style="width:4%"><col style="width:4%"><col style="width:6%">
+    </colgroup>
+    <tr>
+      <th class="hd" rowspan="2">運転者名</th>
+      <th class="hd" rowspan="2">使用日</th>
+      <th class="hd" rowspan="2">使用時間</th>
+      <th class="hd" rowspan="2">行先（工事名）</th>
+      <th class="hd" rowspan="2">走行最終<br>メーター</th>
+      <th class="hd" colspan="2">アルコール数値<br><span class="small">(0.15mg未満ok)</span></th>
+      <th class="hd" rowspan="2">酒気帯び<br>目視確認</th>
+      <th class="hd" rowspan="2"><span class="vh">ペダル踏みしろ・効き具合</span></th>
+      <th class="hd" rowspan="2"><span class="vh">サイドブレーキ・効き具合</span></th>
+      <th class="hd" rowspan="2"><span class="vh">タイヤ異常な磨耗・損傷</span></th>
+      <th class="hd" rowspan="2"><span class="vh">方向指示器の点灯具合</span></th>
+      <th class="hd" rowspan="2">給油<br>(ℓ)</th>
+    </tr>
+    <tr><th class="hd small">運転前</th><th class="hd small">運転後</th></tr>
+    ${rowsHtml}
+   </table>
+   <table><tr>
+     <td class="note">${FOOTER_NOTE}</td>
+   </tr></table>
+  `;
+}
+
+/* ============ 出力：書き出し/取込 ============ */
+$("exportMonthBtn").addEventListener("click",async ()=>{
+  const ym=$("o-month").value||listMonth;
+  const payload={type:"untenNippou", version:1, profile, month:ym, entries:entriesOfMonth(ym)};
+  const txt=JSON.stringify(payload,null,2);
+  // iOSはまずWeb Share（メール/AirDrop/メモ/ファイルへ確実に渡せる）→だめならクリップボード→最後にテキスト表示
+  try{
+    if(navigator.share){ await navigator.share({title:`運転日報 ${ym}`, text:txt}); return; }
+  }catch(e){ if(e&&e.name==="AbortError") return; }
+  if(navigator.clipboard && window.isSecureContext){
+    try{ await navigator.clipboard.writeText(txt); toast("コピーしました（Claude Codeに貼付）✓"); return; }catch(e){}
+  }
+  fallbackCopy(txt);
+});
+function fallbackCopy(txt){
+  const ta=document.createElement("textarea");
+  ta.value=txt; ta.readOnly=false; ta.contentEditable=true;
+  ta.style.position="fixed"; ta.style.top="0"; ta.style.left="0"; ta.style.opacity="0";
+  document.body.appendChild(ta);
+  const range=document.createRange(); range.selectNodeContents(ta);
+  const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  ta.setSelectionRange(0, txt.length);
+  let ok=false; try{ ok=document.execCommand("copy"); }catch(e){}
+  document.body.removeChild(ta);
+  if(ok){ toast("コピーしました ✓"); }
+  else { showTextModal(txt); }
+}
+function showTextModal(txt){
+  const ov=document.createElement("div");
+  ov.style.cssText="position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.75);display:flex;flex-direction:column;padding:16px;gap:10px";
+  ov.innerHTML=`<div style="color:#fff;font-size:13px">下のテキストを長押し→全選択→コピーしてClaude Codeに貼り付けてください</div>
+    <textarea readonly style="flex:1;width:100%;font-size:12px;background:#111;color:#ddd;border-radius:8px;padding:8px"></textarea>
+    <button style="padding:12px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-weight:700">閉じる</button>`;
+  ov.querySelector("textarea").value=txt;
+  ov.querySelector("button").addEventListener("click",()=>document.body.removeChild(ov));
+  document.body.appendChild(ov);
+}
+$("exportAllBtn").addEventListener("click",async ()=>{
+  const payload={type:"untenNippou", version:1, exportedAt:new Date().toISOString(), profile, entries, submitted};
+  const json=JSON.stringify(payload,null,2);
+  const fname=`unten-nippou_backup_${todayISO()}.json`;
+  const blob=new Blob([json],{type:"application/json"});
+  const file=new File([blob],fname,{type:"application/json"});
+  // iOS: Web Share（ファイル）でメール/AirDrop/ファイルアプリへ確実に保存
+  try{
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:"運転日報バックアップ"});
+      stampBackup(); return;
+    }
+  }catch(e){ if(e&&e.name==="AbortError"){ return; } }
+  // フォールバック: ダウンロード
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=fname; a.rel="noopener";
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); },4000);
+  stampBackup();
+});
+function stampBackup(){ safeSet(LSK_BK, todayISO()); toast("バックアップを保存しました ✓"); updateReminder(); }
+
+$("importBtn").addEventListener("click",()=>$("importFile").click());
+$("importFile").addEventListener("change",ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  if(f.size>8*1024*1024){ toast("ファイルが大きすぎます",true); ev.target.value=""; return; }
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const data=JSON.parse(r.result);
+      if(!confirm("バックアップを読み込みます。現在のデータと統合します。よろしいですか？")){ return; }
+      if(data.profile){ profile=Object.assign({},DEF_PROFILE,data.profile); saveProfile(profile); }
+      if(Array.isArray(data.entries)){
+        const map={}; entries.forEach(e=>map[e.id]=e);
+        data.entries.forEach(e=>{
+          if(!e || !isISODate(e.date)) return;      // 不正レコードは弾く
+          if(!e.id) e.id=uid();                      // id欠落は採番（潰れ防止）
+          const ex=map[e.id];
+          if(!ex || (e.ts||0)>=(ex.ts||0)) map[e.id]=e;  // 新しい方を採用
+        });
+        entries=Object.values(map); saveEntries(entries);
+      }
+      if(data.submitted && typeof data.submitted==="object"){ submitted=Object.assign({},submitted,data.submitted); saveSubmitted(submitted); }
+      updateVehLine(); renderDestChips(); renderList(); refreshSubStatus(); updateReminder();
+      toast("読み込みました ✓");
+    }catch(e){ toast("JSON形式が不正です。読み込めませんでした",true); }
+  };
+  r.readAsText(f);
+  ev.target.value="";
+});
+
+/* ============ 提出リマインダー ============ */
+function prevYm(){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
+function updateReminder(){
+  const el=$("reminder"); if(!el) return;
+  const now=new Date(), day=now.getDate();
+  const cur=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+  const pv=prevYm();
+  let target=null;
+  if(!submitted[pv] && entries.some(e=>e.date&&e.date.slice(0,7)===pv)) target=pv;          // 前月未提出＝最優先
+  else if(day>=26 && !submitted[cur] && entries.some(e=>e.date&&e.date.slice(0,7)===cur)) target=cur; // 月末は今月分も促す
+  if(target){
+    const [yy,mm]=target.split("-");
+    el.style.display="flex";
+    el.innerHTML=`<span>📋 ${yy}年${Number(mm)}月分の運転日報が未提出です</span><a href="#" id="remGo">出力へ →</a>`;
+    $("remGo").addEventListener("click",ev=>{ ev.preventDefault(); $("o-month").value=target; document.querySelector('.tabbar button[data-v="out"]').click(); refreshSubStatus(); });
+  } else { el.style.display="none"; }
+}
+
+/* ============ 初期化 ============ */
+async function init(){
+  buildInsp();
+  renderDestChips();
+  resetInputForm();
+  updateVehLine();
+  $("o-month").value=ymNow();
+  refreshSubStatus();
+  updateReminder();
+  // eviction耐性を上げる（best-effort）
+  try{ if(navigator.storage && navigator.storage.persist){ await navigator.storage.persist(); } }catch(e){}
+  // Service Worker（オフライン動作・https/localhostのみ）
+  if("serviceWorker" in navigator && (location.protocol==="https:"||location.hostname==="localhost")){
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }
+  if(!profile.sharyo && entries.length===0){
+    setTimeout(()=>toast("まず⚙️設定で車両を登録してください"),400);
+  }
+}
+init();
+</script>
+</body>
+</html>

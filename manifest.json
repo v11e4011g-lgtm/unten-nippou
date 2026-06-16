@@ -1,0 +1,15 @@
+{
+  "name": "運転日報・始業点検記録",
+  "short_name": "運転日報",
+  "description": "社有車の運転日報・始業点検記録をiPhoneで入力し、月末に公式様式で印刷/提出するアプリ",
+  "start_url": "./unten-nippou.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1115",
+  "theme_color": "#1f6feb",
+  "lang": "ja",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
