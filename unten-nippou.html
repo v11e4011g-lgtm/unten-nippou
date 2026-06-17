@@ -100,6 +100,8 @@
   .warnbox{background:#3a2a0a; border:1px solid #7a5a1f; color:#fde68a; border-radius:10px; padding:10px 12px; font-size:12.5px; margin-bottom:12px;}
   .caution{background:#2a1410; border:1px solid #7a3a2f; color:#fdba9a; border-radius:10px; padding:9px 11px; font-size:11.5px; line-height:1.5; margin-top:12px;}
   .reminder{background:#3a2a0a; border-bottom:1px solid #7a5a1f; color:#fde68a; padding:10px 16px; font-size:13px; display:flex; align-items:center; gap:10px; justify-content:space-between;}
+  .storagewarn{background:#3d0b0b; border-bottom:1px solid #7a1f1f; color:#fecaca; padding:11px 16px; font-size:13px; line-height:1.5;}
+  .storagewarn b{color:#fff;}
   .reminder a{color:#fcd34d; font-weight:700; white-space:nowrap;}
   .li-ng{color:var(--bad); font-weight:700;}
   .center{text-align:center;}
@@ -137,6 +139,7 @@
   <div class="veh" id="vehLine">車両未設定 — 設定タブで登録してください</div>
 </header>
 
+<div id="storageWarn" class="storagewarn" style="display:none"></div>
 <div id="reminder" class="reminder" style="display:none"></div>
 
 <main>
@@ -325,12 +328,33 @@ function safeSet(key,val){
   try{ localStorage.setItem(key,val); return true; }
   catch(e){ toast("保存できませんでした（端末の空き容量を確認してください）",true); return false; }
 }
+/* IndexedDB 控え（localStorageが消えても残りやすい二重保存）*/
+const IDB_NAME="untenNippouDB", IDB_STORE="kv";
+function idbOpen(){ return new Promise((res,rej)=>{ try{ const r=indexedDB.open(IDB_NAME,1);
+  r.onupgradeneeded=()=>{ try{ r.result.createObjectStore(IDB_STORE); }catch(e){} };
+  r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error||new Error("idb"));
+}catch(e){ rej(e); } }); }
+async function idbSet(key,val){ try{ const db=await idbOpen(); await new Promise((res,rej)=>{ const tx=db.transaction(IDB_STORE,"readwrite"); tx.objectStore(IDB_STORE).put(val,key); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }catch(e){} }
+async function idbGet(key){ try{ const db=await idbOpen(); return await new Promise((res,rej)=>{ const tx=db.transaction(IDB_STORE,"readonly"); const rq=tx.objectStore(IDB_STORE).get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }catch(e){ return undefined; } }
+
 function loadProfile(){ try{return Object.assign({},DEF_PROFILE,JSON.parse(localStorage.getItem(LSK_P)||"{}"));}catch(e){return Object.assign({},DEF_PROFILE);} }
-function saveProfile(p){ safeSet(LSK_P, JSON.stringify(p)); }
+function saveProfile(p){ safeSet(LSK_P, JSON.stringify(p)); idbSet("profile", p); }
 function loadEntries(){ try{return JSON.parse(localStorage.getItem(LSK_E)||"[]");}catch(e){return [];} }
-function saveEntries(a){ safeSet(LSK_E, JSON.stringify(a)); }
+function saveEntries(a){ safeSet(LSK_E, JSON.stringify(a)); idbSet("entries", a); }
 function loadSubmitted(){ try{return JSON.parse(localStorage.getItem(LSK_SUB)||"{}");}catch(e){return {};} }
-function saveSubmitted(o){ safeSet(LSK_SUB, JSON.stringify(o)); }
+function saveSubmitted(o){ safeSet(LSK_SUB, JSON.stringify(o)); idbSet("submitted", o); }
+// localStorageが空でIDBに控えがあれば復元（端末がlocalStorageだけ消した場合の救済）
+async function restoreFromIDBIfNeeded(){
+  try{
+    if(localStorage.getItem(LSK_E)!=null) return false; // localStorageが生きていれば何もしない
+    const e=await idbGet("entries"); const p=await idbGet("profile"); const s=await idbGet("submitted");
+    let restored=false;
+    if(Array.isArray(e) && e.length){ entries=e; safeSet(LSK_E,JSON.stringify(e)); restored=true; }
+    if(p && typeof p==="object"){ profile=Object.assign({},DEF_PROFILE,p); safeSet(LSK_P,JSON.stringify(profile)); }
+    if(s && typeof s==="object"){ submitted=s; safeSet(LSK_SUB,JSON.stringify(s)); }
+    return restored;
+  }catch(e){ return false; }
+}
 
 let profile=loadProfile();
 let entries=loadEntries();
@@ -363,7 +387,7 @@ document.querySelectorAll(".tabbar button").forEach(b=>{
     $("v-"+v).classList.add("on");
     if(v==="list") renderList();
     if(v==="set") fillSettings();
-    if(v==="out"){ if(!$("o-month").value) $("o-month").value=listMonth; refreshSubStatus(); }
+    if(v==="out"){ if(!$("o-month").value) $("o-month").value=listMonth; refreshSubStatus(); updateBackupHint(); }
     window.scrollTo(0,0);
   });
 });
@@ -810,7 +834,7 @@ $("exportAllBtn").addEventListener("click",async ()=>{
   setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); },4000);
   stampBackup();
 });
-function stampBackup(){ safeSet(LSK_BK, todayISO()); toast("バックアップを保存しました ✓"); updateReminder(); }
+function stampBackup(){ safeSet(LSK_BK, todayISO()); toast("バックアップを保存しました ✓"); updateReminder(); updateBackupHint(); }
 
 $("importBtn").addEventListener("click",()=>$("importFile").click());
 $("importFile").addEventListener("change",ev=>{
@@ -859,8 +883,37 @@ function updateReminder(){
   } else { el.style.display="none"; }
 }
 
+/* ============ 保存の健全性 ============ */
+async function updateStorageHealth(){
+  const el=$("storageWarn"); if(!el) return;
+  const ua=navigator.userAgent||"";
+  const isiOS=/iPhone|iPad|iPod/.test(ua) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+  const nonSafariIOS=isiOS && /(CriOS|FxiOS|EdgiOS|OPiOS)/.test(ua);   // iPhone上のChrome/Firefox/Edge/Opera
+  const standalone=isStandalone();
+  let msg="";
+  if(nonSafariIOS){
+    msg=`⚠️ <b>このブラウザ（Chrome等）はデータが消えやすいです。</b> iPhoneでは必ず <b>Safari</b> でこのページを開き、「共有 → ホーム画面に追加」して、そのアイコンから使ってください。先に「出力 → 全データをバックアップ保存」を。`;
+  } else if(isiOS && !standalone){
+    msg=`⚠️ <b>ホーム画面に未追加です（データが消えやすい状態）。</b> Safariの「共有 → ホーム画面に追加」をして、そのアイコンから使ってください。`;
+  }
+  if(msg){ el.style.display="block"; el.innerHTML=msg; }
+  else { el.style.display="none"; }
+}
+function daysSince(iso){ if(!iso) return null; const p=iso.split("-").map(Number); const then=new Date(p[0],p[1]-1,p[2]); return Math.floor((new Date() - then)/86400000); }
+function updateBackupHint(){
+  const el=$("backupHint"); if(!el) return;
+  const base="コピー/共有したデータをClaude Codeに渡すと、会社の原紙Excel（.xlsx）に自動記入できます。";
+  const last=localStorage.getItem(LSK_BK);
+  if(!entries.length){ el.innerHTML=base; return; }
+  if(!last){ el.innerHTML=`⚠️ <b style="color:#fca5a5">まだ一度もバックアップしていません。</b>「全データをバックアップ保存」を今すぐ。<br>`+base; return; }
+  const d=daysSince(last);
+  el.innerHTML=`最終バックアップ：${last}（${d}日前）${d>=7?' — <b style="color:#fca5a5">そろそろ取りましょう</b>':''}<br>`+base;
+}
+
 /* ============ 初期化 ============ */
 async function init(){
+  // ① localStorageが消えていたらIDBの控えから復元
+  await restoreFromIDBIfNeeded();
   buildInsp();
   populateDestSelect();
   resetInputForm();
@@ -868,9 +921,13 @@ async function init(){
   $("o-month").value=ymNow();
   refreshSubStatus();
   updateReminder();
-  // eviction耐性を上げる（best-effort）
+  updateBackupHint();
+  // ② eviction耐性（best-effort）。Safariのホーム画面アプリなら許可されやすい
   try{ if(navigator.storage && navigator.storage.persist){ await navigator.storage.persist(); } }catch(e){}
-  // Service Worker（オフライン動作・https/localhostのみ）
+  updateStorageHealth();
+  // ③ 既存データをIDB控えへもミラー（今後に備える）
+  idbSet("entries", entries); idbSet("profile", profile); idbSet("submitted", submitted);
+  // ④ Service Worker（オフライン・https/localhostのみ）
   if("serviceWorker" in navigator && (location.protocol==="https:"||location.hostname==="localhost")){
     navigator.serviceWorker.register("sw.js").catch(()=>{});
   }

@@ -1,5 +1,5 @@
 /* 運転日報アプリ Service Worker — オフライン動作用（アプリ本体をキャッシュ）*/
-const CACHE = 'unten-nippou-v2';
+const CACHE = 'unten-nippou-v3';
 const ASSETS = ['./', './unten-nippou.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (e) => {
